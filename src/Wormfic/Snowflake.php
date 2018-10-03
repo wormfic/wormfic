@@ -112,8 +112,12 @@ class Snowflake
      * @param int  $processID  Valid values are in the range of 0-31.
      * @return string
      */
-    static function generate(int $workerID = 1, int $processID = 0)
+    static function generate()
     {
+        $c         = new Config;
+        $workerID  = $c->workerID;
+        $processID = $c->processID;
+
         if ($workerID > 31 || $workerID < 0) {
             throw new \InvalidArgumentException('Worker ID is out of range');
         }
