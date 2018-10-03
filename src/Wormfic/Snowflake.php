@@ -7,7 +7,8 @@
  * Website: https://charuru.moe
  * License: https://github.com/CharlotteDunois/Yasmin/blob/master/LICENSE
  */
-namespace \Wormfic;
+
+namespace Wormfic;
 
 /**
  * Represents a Snowflake. This is identical to the Yasmin version, just with an edited epoch.

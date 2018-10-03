@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#composer-lock-the-lock-file",
         "This file is @generated automatically"
     ],
-    "content-hash": "560cbb347cf4dad03a6b2a9a656e94d5",
+    "content-hash": "b52b922a7b55c241dcbe08f9c4dd6297",
     "packages": [
         {
             "name": "charlottedunois/collection",
@@ -407,6 +407,16 @@
     "stability-flags": [],
     "prefer-stable": false,
     "prefer-lowest": false,
-    "platform": [],
-    "platform-dev": []
+    "platform": {
+        "ext-curl": "*",
+        "ext-intl": "*",
+        "ext-json": "*",
+        "ext-mbstring": "*",
+        "ext-pdo": "*",
+        "ext-reflection": "*",
+        "php-64bit": "^7.2"
+    },
+    "platform-dev": {
+        "ext-xdebug": "*"
+    }
 }
