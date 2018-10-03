@@ -1,4 +1,5 @@
 composer.phar
+config.php
 localTest.php
 /vendor/
 *.bak
