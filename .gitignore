@@ -1,6 +1,15 @@
+# composer
 composer.phar
-config.php
-localTest.php
 /vendor/
+
+# roadrunner
+rr.exe
+rr
+
+# local config
+config.php
+
+# dev
+localTest.php
 *.bak
 /nbproject/private/
