@@ -15,7 +15,7 @@ namespace Wormfic;
  *
  * @author Keira Sylae Aro <sylae@calref.net>
  */
-class SessionHandler implements \SessionHandlerInterface, \SessionIdInterface, \ SessionUpdateTimestampHandlerInterface
+class SessionHandler implements \SessionHandlerInterface, \SessionIdInterface, \SessionUpdateTimestampHandlerInterface
 {
 
     public function close(): bool
