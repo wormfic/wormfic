@@ -17,8 +17,19 @@ class Blob
 {
     public $renderEngine;
     public $body;
+    public $id;
 
-    public function __construct()
+    public function __construct(string $renderEngine, string $body)
+    {
+
+    }
+
+    public static function createCommonBlob(string $renderEngine, string $body): Blob
+    {
+
+    }
+
+    public static function createFromID(int $id): Blob
     {
 
     }

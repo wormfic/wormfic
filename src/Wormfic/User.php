@@ -15,43 +15,206 @@ use Carbon\Carbon;
  *
  * @author Keira Sylae Aro <sylae@calref.net>
  */
-class User {
+class User
+{
+    const PASS_PARAMS = ['time_cost' => 200];
+    const PASS_ALGO   = \PASSWORD_ARGON2ID;
 
-  public $idUser;
-  public $username;
-  private $password;
-  public $created;
-  public $updated;
-  public $status;
-  public $birthday;
-  public $gender;
-  public $profile;
+    /**
+     * Usernames that can't be taken. We do basic spoof checking with intl.
+     */
+    const PROTECTED_USERNAMES = ['root', 'webmaster', 'admin', 'administrator', 'mod', 'moderator'];
 
-  public function __construct(int $idUser, string $username, string $password, Carbon $created, Carbon $updated, string $status) {
-    $this->idUser = $idUser;
-    $this->username = $username;
-    $this->password = $password;
-    $this->created = $created;
-    $this->updated = $updated;
-    $this->status = $status;
-  }
+    public $idUser;
+    public $username;
+    private $password;
+    public $email;
 
-  public static function fromSession(string $sessionData) {
-    $data = json_decode($sessionData);
-    if (property_exists($data, "idUser")) {
-      $query = Database::get()->prepare("select * from users"
-        . "where idUser = ?");
-      $query->bindValue(1, $data->idUser, "integer");
-      $query->execute();
-      $dbData = $query->fetch();
-      // birthday, gender, profile_renderEngine, profile_content
-      // construct the initial object
-      $x = new User($dbData['idUser'], $dbData['sessionData'], $dbData['password'], (new Carbon($dbData['created'])), (new Carbon($dbData['updated'])), $dbData['status']);
+    /**
+     *
+     * @var Carbon
+     */
+    public $created;
 
-      if (array_key_exists('profile_renderEngine', $dbData) && array_key_exists('profile_content', $dbData)) {
+    /**
+     *
+     * @var Carbon
+     */
+    public $updated;
+    public $status;
 
-      }
+    /**
+     *
+     * @var Carbon
+     */
+    public $birthday;
+    public $gender;
+
+    /**
+     *
+     * @var Blob
+     */
+    public $profile;
+    public $language = "en-US";
+    public $timezone = "UTC";
+
+    public function __construct(int $idUser, string $username, string $password, string $email, Carbon $created, Carbon $updated, string $status)
+    {
+        $this->idUser   = $idUser;
+        $this->username = $username;
+        $this->password = $password;
+        $this->email    = $email;
+        $this->created  = $created;
+        $this->updated  = $updated;
+        $this->status   = $status;
     }
-  }
 
+    public static function fromSession(): User
+    {
+        if (array_key_exists("idUser", $_SESSION)) {
+            return self::fromID($_SESSION['idUser']);
+        }
+    }
+
+    public static function fromID(int $id): User
+    {
+        $query  = Database::get()->prepare("select * from users"
+        . "where idUser = ?");
+        $query->bindValue(1, $id, "integer");
+        $query->execute();
+        $dbData = $query->fetch();
+
+        return self::dbArrayToObject($dbData);
+    }
+
+    public static function fromName(string $username): User
+    {
+        $query  = Database::get()->prepare("select * from users"
+        . "where username = ?");
+        $query->bindValue(1, $username, "string");
+        $query->execute();
+        $dbData = $query->fetch();
+
+        return self::dbArrayToObject($dbData);
+    }
+
+    public static function login(string $username, string $givenPassword): User
+    {
+        $user = self::fromName($username);
+
+        if ($user->verifyPassword($givenPassword)) {
+            return true;
+        } else {
+            throw new Exception\LoginException("incorrectPassword");
+        }
+    }
+
+    public function verifyPassword(string $givenPassword): bool
+    {
+        if (password_verify($givenPassword, self::PASS_ALGO, self::PASS_PARAMS)) {
+            if (password_needs_rehash($this->password, self::PASS_ALGO, self::PASS_PARAMS)) {
+                $this->setPassword($givenPassword, true);
+                $this->auditLog("pass_HashUpdateAuto");
+            }
+            $this->auditLog("pass_verifySuccess");
+            return true;
+        }
+        $this->auditLog("pass_verifyFail");
+        return false;
+    }
+
+    public function setPassword(string $newPassword, bool $ignoreValidation = false): bool
+    {
+        if (!$ignoreValidation && !self::validatePasswordSecurity($newPassword)) {
+            return false;
+        }
+        $query = Database::get()->prepare('UPDATE users '
+        . 'set `password` = ? '
+        . 'where `idUser` = ?;', ['string', 'integer']);
+
+        $query->bindValue(1, password_hash($newPassword, self::PASS_ALGO, self::PASS_PARAMS));
+        $query->bindValue(2, $this->idUser);
+        $query->execute();
+        return (bool) $query->rowCount();
+    }
+
+    public function registerAccount(string $username, string $pass, string $email): User
+    {
+        // name validation
+        $nameTaken = Database::get()->prepare("select * from users"
+        . "where username = ?");
+        $nameTaken->bindValue(1, $username, "string");
+        $nameTaken->execute();
+        if ($nameTaken->fetch()) {
+            throw new Exception\RegistrationException("usernameTaken");
+        }
+        $checker = new \Spoofchecker();
+        foreach (self::PROTECTED_USERNAMES as $name) {
+            if ($checker->areConfusable($name, $username) || $checker->areConfusable($name, mb_strtolower($username))) {
+                throw new Exception\RegistrationException("protectedUsername");
+            }
+        }
+
+        // email validation
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            throw new Exception\RegistrationException("invalidEmail");
+        }
+
+        // password security validation
+        if (!self::validatePasswordSecurity($pass)) {
+            throw new Exception\RegistrationException("invalidPassword");
+        }
+
+        // make it!
+        $userID = Snowflake::generate();
+        $query  = Database::get()->prepare('INSERT INTO users '
+        . '(`username`, `password`, `email`, `idUser`, `status`) '
+        . 'VALUES(?, ?, ?, ?, "active");', ['string', 'string', 'string', 'integer']);
+
+        $query->bindValue(1, $username);
+        $query->bindValue(2, $pass);
+        $query->bindValue(3, $email);
+        $query->bindValue(4, $userID);
+        $query->execute();
+
+        return self::fromID($userID);
+    }
+
+    public function auditLog(string $action, int $item = null, array $data = null): void
+    {
+        $query = Database::get()->prepare('INSERT INTO users__audit '
+        . '(`idUser`, `logTime`, `logAction`, `logAddr`, `logItem`, `logData`) '
+        . 'VALUES(?, NOW(), ?, INET6_ATON(?), ?, ?);', ['integer', 'string', 'string', 'string', 'string']);
+
+        $query->bindValue(1, $this->idUser);
+        $query->bindValue(2, $action);
+        $query->bindValue(3, $_SERVER['REMOTE_ADDR'] ?? null);
+        $query->bindValue(4, $item);
+        $query->bindValue(5, $data);
+        $query->execute();
+    }
+
+    private static function dbArrayToObject(array $dbData): User
+    {
+        // todo verify account hasn't been delet or something
+
+        $x = new User($dbData['idUser'], $dbData['sessionData'], $dbData['password'], $dbData['email'](new Carbon($dbData['created'])), (new Carbon($dbData['updated'])), $dbData['status']);
+
+        if (array_key_exists('profile_renderEngine', $dbData) && array_key_exists('profile_content', $dbData)) {
+            $x->profile = new Blob($dbData['profile_renderEngine'], $dbData['profile_content']);
+        }
+        if (array_key_exists('profile_birthday', $dbData)) {
+            $x->birthday = new Carbon($dbData['profile_birthday']);
+        }
+        if (array_key_exists('profile_gender', $dbData)) {
+            $x->gender = $dbData['profile_gender'];
+        }
+
+        return $x;
+    }
+
+    public static function validatePasswordSecurity(string $pass)
+    {
+        return !(stripos($pass, "\0") !== false || strlen(trim($pass)) == 0);
+    }
 }
