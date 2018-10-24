@@ -32,7 +32,9 @@ $uri = rawurldecode($uri);
 $routeInfo = $dispatcher->dispatch($_SERVER['REQUEST_METHOD'], $uri);
 switch ($routeInfo[0]) {
     case FastRoute\Dispatcher::NOT_FOUND:
-        // ... 404 Not Found
+        $vars           = ['uri' => $uri];
+        $handler        = new Handler\NotFoundHandler();
+        echo $handler->respond($vars);
         break;
     case FastRoute\Dispatcher::METHOD_NOT_ALLOWED:
         $allowedMethods = $routeInfo[1];
@@ -44,10 +46,3 @@ switch ($routeInfo[0]) {
         // ... call $handler with $vars
         break;
 }
-
-$_SESSION['booty'] ++;
-
-
-header("Content-Type: application/json");
-echo json_encode([$routeInfo, $_SESSION, session_name()]);
-
