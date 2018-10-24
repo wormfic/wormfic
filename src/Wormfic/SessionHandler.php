@@ -15,108 +15,74 @@ namespace Wormfic;
  *
  * @author Keira Sylae Aro <sylae@calref.net>
  */
-class SessionHandler implements \SessionHandlerInterface, \SessionIdInterface, \SessionUpdateTimestampHandlerInterface
+class SessionHandler
 {
 
-    public function close(): bool
+    public static function destroy(string $sessionId): bool
     {
-        return true;
+
+        $query = Database::get()->prepare("delete from `data` "
+        . "where idSession = ?");
+        $query->bindValue(1, $sessionId, "string");
+        $query->execute();
+        return (bool) $query->rowCount();
     }
 
-    public function destroy(string $sessionId): bool
-    {
-        try {
-            $query = Database::get()->prepare("delete from `data` "
-            . "where idSession = ?");
-            $query->bindValue(1, $sessionId, "integer");
-            $query->execute();
-            return (bool) $query->rowCount();
-        } catch (\Throwable $e) {
-            return false;
-        }
-    }
-
-    public function gc(int $maximumLifetime): int
-    {
-        try {
-            $query = Database::get()->prepare("delete from `data` "
-            . "where changed <= ?");
-            $query->bindValue(1, $maximumLifetime, "integer");
-            $query->execute();
-            return true;
-        } catch (\Throwable $e) {
-            return false;
-        }
-    }
-
-    public function open(string $sessionSavePath, string $sessionName): bool
-    {
-        try {
-            $db = Database::get();
-            if (!$db->isConnected()) {
-                $db->connect();
-            }
-            return true;
-        } catch (\Throwable $e) {
-            return false;
-        }
-    }
-
-    public function read(string $sessionId): string
+    public static function read(string $sessionId): string
     {
         $query = Database::get()->prepare("select `data` from users__sessions"
         . "where idSession = ?");
-        $query->bindValue(1, $sessionId, "integer");
+        $query->bindValue(1, $sessionId, "string");
         $query->execute();
         $data  = $query->fetchColumn();
 
         return is_string($data) ? $data : "";
     }
 
-    public function write(string $sessionId, string $sessionData): bool
+    public static function write(string $sessionId, string $sessionData = "{}", ?\Psr\Http\Message\RequestInterface $req = null): bool
     {
-        try {
+        if ($req instanceof \Psr\Http\Message\RequestInterface) {
+            $query = Database::get()->prepare('INSERT INTO users__sessions '
+            . '(`idSession`, `data`, `changed`, `userAgent`) VALUES(?, ?, NOW(), ?) '
+            . 'ON DUPLICATE KEY UPDATE `data`=VALUES(`data`), '
+            . '`changed`=VALUES(`changed`), `userAgent`=VALUES(`userAgent`);', ['string', 'string', 'string']);
+            $query->bindValue(3, $req->getHeader("User-Agent")[0] ?? null);
+        } else {
             $query = Database::get()->prepare('INSERT INTO users__sessions '
             . '(`idSession`, `data`, `changed`) VALUES(?, ?, NOW()) '
             . 'ON DUPLICATE KEY UPDATE `data`=VALUES(`data`), '
-            . '`changed`=VALUES(`changed`);', ['integer', 'string']);
-            $query->bindValue(1, $sessionId);
-            $query->bindValue(2, $sessionData);
-            $query->execute();
-            return (bool) $query->rowCount();
-        } catch (\Throwable $e) {
-            return false;
+            . '`changed`=VALUES(`changed`);', ['string', 'string']);
         }
+        $query->bindValue(1, $sessionId);
+        $query->bindValue(2, $sessionData);
+        $query->execute();
+        return (bool) $query->rowCount();
     }
 
-    public function create_sid(): string
+    public static function validateId(string $sessionId): bool
     {
-        return Snowflake::generate();
+
+        $query = Database::get()->prepare("select count(*) from users__sessions "
+        . "where idSession = ?");
+        $query->bindValue(1, $sessionId, "string");
+        $query->execute();
+        return (bool) $query->fetchColumn();
     }
 
-    public function validateId(string $sessionId): bool
+    public static function updateTimestamp(string $sessionId, ?\Psr\Http\Message\RequestInterface $req = null): bool
     {
-        try {
-            $query = Database::get()->prepare("select count(*) from users__sessions"
-            . "where idSession = ?");
-            $query->bindValue(1, $sessionId, "integer");
-            $query->execute();
-            return (bool) $query->fetchColumn();
-        } catch (\Throwable $e) {
-            return false;
-        }
-    }
 
-    public function updateTimestamp(string $sessionId, string $sessionData): bool
-    {
-        try {
+        if ($req instanceof \Psr\Http\Message\RequestInterface) {
             $query = Database::get()->prepare('UPDATE users__sessions '
-            . 'SET changed = NOW() where idSession = ?;', ['integer']);
-            $query->bindValue(1, $sessionId);
-            $query->execute();
-            return (bool) $query->rowCount();
-        } catch (\Throwable $e) {
-            return false;
+            . 'SET changed = NOW(), userAgent = ? '
+            . 'where idSession = ?;', ['string', 'string']);
+            $query->bindValue(2, $req->getHeader("User-Agent")[0] ?? null);
+        } else {
+            $query = Database::get()->prepare('UPDATE users__sessions '
+            . 'SET changed = NOW() where idSession = ?;', ['string']);
         }
+        $query->bindValue(1, $sessionId);
+        $query->execute();
+        return (bool) $query->rowCount();
     }
 }
