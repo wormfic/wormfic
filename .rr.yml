@@ -1,6 +1,0 @@
-http:
-  address: :8080
-  workers:
-    command: "php wormfic-worker.php"
-    pool:
-      numWorkers: 4

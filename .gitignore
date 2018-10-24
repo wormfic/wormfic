@@ -2,10 +2,6 @@
 composer.phar
 /vendor/
 
-# roadrunner
-rr.exe
-rr
-
 # local config
 config.php
 
