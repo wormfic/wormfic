@@ -78,7 +78,7 @@ class User
 
     public static function fromID(int $id): User
     {
-        $query  = Database::get()->prepare("select * from users"
+        $query  = Database::get()->prepare("select * from users "
         . "where idUser = ?");
         $query->bindValue(1, $id, "integer");
         $query->execute();
@@ -89,7 +89,7 @@ class User
 
     public static function fromName(string $username): User
     {
-        $query  = Database::get()->prepare("select * from users"
+        $query  = Database::get()->prepare("select * from users "
         . "where username = ?");
         $query->bindValue(1, $username, "string");
         $query->execute();
@@ -138,10 +138,10 @@ class User
         return (bool) $query->rowCount();
     }
 
-    public function registerAccount(string $username, string $pass, string $email): User
+    public static function registerAccount(string $username, string $pass, string $email): User
     {
         // name validation
-        $nameTaken = Database::get()->prepare("select * from users"
+        $nameTaken = Database::get()->prepare("select * from users "
         . "where username = ?");
         $nameTaken->bindValue(1, $username, "string");
         $nameTaken->execute();
@@ -172,25 +172,29 @@ class User
         . 'VALUES(?, ?, ?, ?, "active");', ['string', 'string', 'string', 'integer']);
 
         $query->bindValue(1, $username);
-        $query->bindValue(2, $pass);
+        $query->bindValue(2, password_hash($pass, self::PASS_ALGO, self::PASS_PARAMS));
         $query->bindValue(3, $email);
         $query->bindValue(4, $userID);
         $query->execute();
 
-        return self::fromID($userID);
+        $user = self::fromID($userID);
+        $user->auditLog("user_register");
+        return $user;
     }
 
     public function auditLog(string $action, int $item = null, array $data = null): void
     {
+        $logID = Snowflake::generate();
         $query = Database::get()->prepare('INSERT INTO users__audit '
-        . '(`idUser`, `logTime`, `logAction`, `logAddr`, `logItem`, `logData`) '
-        . 'VALUES(?, NOW(), ?, INET6_ATON(?), ?, ?);', ['integer', 'string', 'string', 'string', 'string']);
+        . '(`idUser`, `logTime`, `logAction`, `logAddr`, `logItem`, `logData`, `idAudit`) '
+        . 'VALUES(?, NOW(), ?, INET6_ATON(?), ?, ?, ?);', ['integer', 'string', 'string', 'string', 'string', 'integer']);
 
         $query->bindValue(1, $this->idUser);
         $query->bindValue(2, $action);
         $query->bindValue(3, $_SERVER['REMOTE_ADDR'] ?? null);
         $query->bindValue(4, $item);
         $query->bindValue(5, $data);
+        $query->bindValue(6, $logID);
         $query->execute();
     }
 
@@ -198,16 +202,16 @@ class User
     {
         // todo verify account hasn't been delet or something
 
-        $x = new User($dbData['idUser'], $dbData['sessionData'], $dbData['password'], $dbData['email'](new Carbon($dbData['created'])), (new Carbon($dbData['updated'])), $dbData['status']);
+        $x = new User($dbData['idUser'], $dbData['username'], $dbData['password'], $dbData['email'], (new Carbon($dbData['created'])), (new Carbon($dbData['updated'])), $dbData['status']);
 
-        if (array_key_exists('profile_renderEngine', $dbData) && array_key_exists('profile_content', $dbData)) {
+        if (!is_null($dbData['profile_renderEngine']) && !is_null($dbData['profile_content'])) {
             $x->profile = new Blob($dbData['profile_renderEngine'], $dbData['profile_content']);
         }
-        if (array_key_exists('profile_birthday', $dbData)) {
-            $x->birthday = new Carbon($dbData['profile_birthday']);
+        if (!is_null($dbData['birthday'])) {
+            $x->birthday = new Carbon($dbData['birthday']);
         }
-        if (array_key_exists('profile_gender', $dbData)) {
-            $x->gender = $dbData['profile_gender'];
+        if (!is_null($dbData['gender'])) {
+            $x->gender = $dbData['gender'];
         }
 
         return $x;

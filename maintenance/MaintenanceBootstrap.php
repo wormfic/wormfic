@@ -6,11 +6,11 @@
  * can be found in the LICENSE file.
  */
 
+namespace Wormfic;
+
 if (php_sapi_name() != "cli") {
     die("Maintenance can only be run from CLI. Goodbye!");
 }
-
-namespace Wormfic;
 
 require_once __DIR__ . "/../vendor/autoload.php";
 require_once __DIR__ . "/../config.php";
