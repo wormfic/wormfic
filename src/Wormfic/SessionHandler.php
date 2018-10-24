@@ -15,10 +15,25 @@ namespace Wormfic;
  *
  * @author Keira Sylae Aro <sylae@calref.net>
  */
-class SessionHandler
+class SessionHandler implements \SessionHandlerInterface, \SessionIdInterface, \SessionUpdateTimestampHandlerInterface
 {
 
-    public static function destroy(string $sessionId): bool
+    public function close(): bool
+    {
+        return true;
+    }
+
+    public function open($save_path, $session_name): bool
+    {
+        return true;
+    }
+
+    public function create_sid(): string
+    {
+        return bin2hex(random_bytes(32));
+    }
+
+    public function destroy($sessionId): bool
     {
 
         $query = Database::get()->prepare("delete from `data` "
@@ -28,9 +43,22 @@ class SessionHandler
         return (bool) $query->rowCount();
     }
 
-    public static function read(string $sessionId): string
+    public function gc($maximumLifetime): int
     {
-        $query = Database::get()->prepare("select `data` from users__sessions"
+        try {
+            $query = Database::get()->prepare("delete from `data` "
+            . "where changed <= ?");
+            $query->bindValue(1, $maximumLifetime, "integer");
+            $query->execute();
+            return true;
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    public function read($sessionId): string
+    {
+        $query = Database::get()->prepare("select `data` from users__sessions "
         . "where idSession = ?");
         $query->bindValue(1, $sessionId, "string");
         $query->execute();
@@ -39,27 +67,23 @@ class SessionHandler
         return is_string($data) ? $data : "";
     }
 
-    public static function write(string $sessionId, string $sessionData = "{}", ?\Psr\Http\Message\RequestInterface $req = null): bool
+    public function write($sessionId, $sessionData = "{}"): bool
     {
-        if ($req instanceof \Psr\Http\Message\RequestInterface) {
-            $query = Database::get()->prepare('INSERT INTO users__sessions '
-            . '(`idSession`, `data`, `changed`, `userAgent`) VALUES(?, ?, NOW(), ?) '
-            . 'ON DUPLICATE KEY UPDATE `data`=VALUES(`data`), '
-            . '`changed`=VALUES(`changed`), `userAgent`=VALUES(`userAgent`);', ['string', 'string', 'string']);
-            $query->bindValue(3, $req->getHeader("User-Agent")[0] ?? null);
-        } else {
-            $query = Database::get()->prepare('INSERT INTO users__sessions '
-            . '(`idSession`, `data`, `changed`) VALUES(?, ?, NOW()) '
-            . 'ON DUPLICATE KEY UPDATE `data`=VALUES(`data`), '
-            . '`changed`=VALUES(`changed`);', ['string', 'string']);
-        }
+        $query = Database::get()->prepare('INSERT INTO users__sessions '
+        . '(`idSession`, `data`, `changed`, `userAgent`, `addr`) VALUES(?, ?, NOW(), ?, INET6_ATON(?)) '
+        . 'ON DUPLICATE KEY UPDATE `data`=VALUES(`data`), '
+        . '`changed`=VALUES(`changed`), `userAgent`=VALUES(`userAgent`), '
+        . '`addr`=VALUES(`addr`);', ['string', 'string', 'string', 'string']);
+
         $query->bindValue(1, $sessionId);
         $query->bindValue(2, $sessionData);
+        $query->bindValue(3, $_SERVER['HTTP_USER_AGENT'] ?? null);
+        $query->bindValue(4, $_SERVER['REMOTE_ADDR'] ?? null);
         $query->execute();
         return (bool) $query->rowCount();
     }
 
-    public static function validateId(string $sessionId): bool
+    public function validateId($sessionId): bool
     {
 
         $query = Database::get()->prepare("select count(*) from users__sessions "
@@ -69,19 +93,16 @@ class SessionHandler
         return (bool) $query->fetchColumn();
     }
 
-    public static function updateTimestamp(string $sessionId, ?\Psr\Http\Message\RequestInterface $req = null): bool
+    public function updateTimestamp($sessionId, $val): bool
     {
+        $query = Database::get()->prepare('INSERT INTO users__sessions '
+        . '(`idSession`, `changed`, `userAgent`, `addr`) VALUES(?, NOW(), ?, INET6_ATON(?)) '
+        . 'ON DUPLICATE KEY UPDATE `changed`=VALUES(`changed`), `userAgent`=VALUES(`userAgent`), '
+        . '`addr`=VALUES(`addr`);', ['string', 'string', 'string']);
 
-        if ($req instanceof \Psr\Http\Message\RequestInterface) {
-            $query = Database::get()->prepare('UPDATE users__sessions '
-            . 'SET changed = NOW(), userAgent = ? '
-            . 'where idSession = ?;', ['string', 'string']);
-            $query->bindValue(2, $req->getHeader("User-Agent")[0] ?? null);
-        } else {
-            $query = Database::get()->prepare('UPDATE users__sessions '
-            . 'SET changed = NOW() where idSession = ?;', ['string']);
-        }
         $query->bindValue(1, $sessionId);
+        $query->bindValue(2, $_SERVER['HTTP_USER_AGENT'] ?? null);
+        $query->bindValue(3, $_SERVER['REMOTE_ADDR'] ?? null);
         $query->execute();
         return (bool) $query->rowCount();
     }
