@@ -32,17 +32,19 @@ $uri = rawurldecode($uri);
 $routeInfo = $dispatcher->dispatch($_SERVER['REQUEST_METHOD'], $uri);
 switch ($routeInfo[0]) {
     case FastRoute\Dispatcher::NOT_FOUND:
-        $vars           = ['uri' => $uri];
-        $handler        = new Handler\NotFoundHandler();
+        $vars    = ['uri' => $uri];
+        $handler = new Handler\NotFoundHandler();
         echo $handler->respond($vars);
         break;
     case FastRoute\Dispatcher::METHOD_NOT_ALLOWED:
-        $allowedMethods = $routeInfo[1];
-        // ... 405 Method Not Allowed
+        // TODO: return json as needed?
+        $vars    = ['allowedMethods' => $routeInfo[1]];
+        $handler = new Handler\BadMethodHandler();
+        echo $handler->respond($vars);
         break;
     case FastRoute\Dispatcher::FOUND:
-        $handler        = $routeInfo[1];
-        $vars           = $routeInfo[2];
+        $handler = $routeInfo[1];
+        $vars    = $routeInfo[2];
         // ... call $handler with $vars
         break;
 }
