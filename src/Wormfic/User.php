@@ -191,7 +191,7 @@ class User
 
         $query->bindValue(1, $this->idUser);
         $query->bindValue(2, $action);
-        $query->bindValue(3, $_SERVER['REMOTE_ADDR'] ?? null);
+        $query->bindValue(3, str_replace(['[', ']'], '', $_SERVER['REMOTE_ADDR']) ?? null);
         $query->bindValue(4, $item);
         $query->bindValue(5, $data);
         $query->bindValue(6, $logID);

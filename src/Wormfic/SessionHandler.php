@@ -78,7 +78,7 @@ class SessionHandler implements \SessionHandlerInterface, \SessionIdInterface, \
         $query->bindValue(1, $sessionId);
         $query->bindValue(2, $sessionData);
         $query->bindValue(3, $_SERVER['HTTP_USER_AGENT'] ?? null);
-        $query->bindValue(4, $_SERVER['REMOTE_ADDR'] ?? null);
+        $query->bindValue(4, str_replace(['[', ']'], '', $_SERVER['REMOTE_ADDR']) ?? null);
         $query->execute();
         return (bool) $query->rowCount();
     }
@@ -102,7 +102,7 @@ class SessionHandler implements \SessionHandlerInterface, \SessionIdInterface, \
 
         $query->bindValue(1, $sessionId);
         $query->bindValue(2, $_SERVER['HTTP_USER_AGENT'] ?? null);
-        $query->bindValue(3, $_SERVER['REMOTE_ADDR'] ?? null);
+        $query->bindValue(3, str_replace(['[', ']'], '', $_SERVER['REMOTE_ADDR']) ?? null);
         $query->execute();
         return (bool) $query->rowCount();
     }
