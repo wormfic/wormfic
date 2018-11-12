@@ -1,0 +1,7 @@
+{
+    "Template": {
+        "TemplateName": "wormficTestEmail",
+        "SubjectPart": "Wormfic.net test email",
+        "TextPart": "Dear {{username}},\r\n\r\nThis is a test of the Wormfic.net email system."
+    }
+}

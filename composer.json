@@ -18,7 +18,8 @@
         "twig/twig": "^2.5",
         "dflydev/fig-cookies": "^2.0",
         "nesbot/carbon": "^2.3",
-        "ulrichsg/getopt-php": "^3.2"
+        "ulrichsg/getopt-php": "^3.2",
+        "aws/aws-sdk-php": "^3.69"
     },
     "require-dev": {
         "ext-xdebug": "*"
