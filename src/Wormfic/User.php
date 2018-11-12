@@ -103,7 +103,7 @@ class User
         $user = self::fromName($username);
 
         if ($user->verifyPassword($givenPassword)) {
-            return true;
+            return $user;
         } else {
             throw new Exception\LoginException("incorrectPassword");
         }
