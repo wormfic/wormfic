@@ -17,10 +17,15 @@ session_set_save_handler((new SessionHandler()));
 session_start();
 
 $dispatcher = FastRoute\simpleDispatcher(function(\FastRoute\RouteCollector $r) {
+    $r->addRoute('GET', '/', 'HomepageHandler');
+
+    // user stuff
+    $r->addRoute(['GET', 'POST'], '/user[/{action}]', 'AccountHandler');
+    $r->addRoute('GET', '/users/{uid}', 'UserHandler');
+
+    // works stuff
     $r->addRoute('GET', '/works/{work}', 'WorkHandler');
     $r->addRoute('GET', '/chapters/{chapter}', 'ChapterHandler');
-    $r->addRoute('GET', '/users/{uid}', 'UserHandler');
-    $r->addRoute('GET', '/user[/{action}]', 'AccountHandler');
 });
 
 $uri = $_SERVER['REQUEST_URI'];
@@ -43,8 +48,8 @@ switch ($routeInfo[0]) {
         echo $handler->respond($vars);
         break;
     case FastRoute\Dispatcher::FOUND:
-        $handler = $routeInfo[1];
-        $vars    = $routeInfo[2];
-        // ... call $handler with $vars
+        $hname   = "Wormfic\\Handler\\{$routeInfo[1]}";
+        $handler = new $hname();
+        echo $handler->respond($routeInfo[2]);
         break;
 }

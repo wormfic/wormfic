@@ -69,33 +69,38 @@ class User
         $this->status   = $status;
     }
 
-    public static function fromSession(): User
+    public static function fromSession(): ?User
     {
         if (array_key_exists("idUser", $_SESSION)) {
             return self::fromID($_SESSION['idUser']);
         }
+        return null;
     }
 
-    public static function fromID(int $id): User
+    public static function fromID(int $id): ?User
     {
         $query  = Database::get()->prepare("select * from users "
         . "where idUser = ?");
         $query->bindValue(1, $id, "integer");
         $query->execute();
         $dbData = $query->fetch();
-
-        return self::dbArrayToObject($dbData);
+        if ($dbData) {
+            return self::dbArrayToObject($dbData);
+        }
+        return null;
     }
 
-    public static function fromName(string $username): User
+    public static function fromName(string $username): ?User
     {
         $query  = Database::get()->prepare("select * from users "
         . "where username = ?");
         $query->bindValue(1, $username, "string");
         $query->execute();
         $dbData = $query->fetch();
-
-        return self::dbArrayToObject($dbData);
+        if ($dbData) {
+            return self::dbArrayToObject($dbData);
+        }
+        return null;
     }
 
     public static function login(string $username, string $givenPassword): User
